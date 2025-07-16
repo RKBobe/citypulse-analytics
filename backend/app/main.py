@@ -1,7 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.endpoints import dashboard
+from app.api.endpoints import dashboard, metrics
+from app.db.base import Base, engine
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -19,36 +23,17 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(
-    dashboard.router,
-    prefix=f"{settings.API_V1_STR}/dashboards",
-    tags=["dashboards"]
-)
+app.include_router(dashboard.router, prefix="/api/v1/dashboards", tags=["dashboards"])
+app.include_router(metrics.router, prefix="/api/v1/metrics", tags=["metrics"])
 
 @app.get("/")
-def root():
+def read_root():
     return {
         "message": "Welcome to CityPulse Analytics API",
         "version": settings.VERSION,
-        "docs": "/docs",
-        "redoc": "/redoc"
+        "docs": "/docs"
     }
 
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
-
-# Create tables on startup (for development)
-@app.on_event("startup")
-async def startup_event():
-    # Import here to avoid circular imports
-    from app.db.base import engine
-    from app.models.models import Base
-    
-    # Create tables if they don't exist
-    Base.metadata.create_all(bind=engine)
-    print("Database tables ready!")
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8001, reload=True)
